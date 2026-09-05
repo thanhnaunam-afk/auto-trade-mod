@@ -2,7 +2,7 @@ package com.thanh.autotrade.util;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.tooltip.TooltipType;
+import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Item;
 import net.minecraft.screen.slot.SlotActionType;
