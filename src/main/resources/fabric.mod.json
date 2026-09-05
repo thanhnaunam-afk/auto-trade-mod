@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "autotrade",
+  "version": "${version}",
+  "name": "AutoTrade",
+  "description": "Tu dong tao Order va ban AH voi gia tinh theo chenh lech thi truong, cho server rieng cua Thanh.",
+  "authors": ["Thanh"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.thanh.autotrade.AutoTradeMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": ">=1.21.11 <1.22",
+    "java": ">=21"
+  }
+}
