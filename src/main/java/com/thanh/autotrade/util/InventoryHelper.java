@@ -21,7 +21,7 @@ public final class InventoryHelper {
     public static int countByName(MinecraftClient mc, String displayName) {
         if (mc.player == null) return 0;
         int total = 0;
-        for (ItemStack stack : mc.player.getInventory().main) {
+        for (ItemStack stack : mc.player.getInventory().getMainStacks()) {
             if (!stack.isEmpty() && stack.getName().getString().equalsIgnoreCase(displayName)) {
                 total += stack.getCount();
             }
@@ -32,7 +32,7 @@ public final class InventoryHelper {
     /** index 0-8 = hotbar, 9-35 = túi chính, trong mảng PlayerInventory.main (size 36). Trả -1 nếu không có. */
     public static int findMainInventoryIndex(MinecraftClient mc, String displayName) {
         if (mc.player == null) return -1;
-        var main = mc.player.getInventory().main;
+        var main = mc.player.getInventory().getMainStacks();
         for (int i = 0; i < main.size(); i++) {
             ItemStack stack = main.get(i);
             if (!stack.isEmpty() && stack.getName().getString().equalsIgnoreCase(displayName)) {
