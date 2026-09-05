@@ -15,9 +15,12 @@ repositories {
 }
 
 loom {
+	splitEnvironmentSourceSets()
+
 	mods {
 		"autotrade" {
 			sourceSet sourceSets.main
+			sourceSet sourceSets.client
 		}
 	}
 }
