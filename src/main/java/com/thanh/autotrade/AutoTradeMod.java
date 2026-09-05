@@ -22,12 +22,13 @@ import org.lwjgl.glfw.GLFW;
 import java.util.List;
 
 /**
- * Cách dùng chính: mở menu bằng phím tắt (mặc định "]", đổi được trong
- * Options -> Controls -> AutoTrade) thay vì gõ lệnh trong chat.
+ * Mở menu chính bằng phím "]" (đổi được trong Options -> Controls -> AutoTrade).
  *
- * calibrate/chatdump VẪN là lệnh chat (client-side, không gửi lên server) vì
- * chúng cần chạy trong lúc /order hoặc /ah đang mở — mở Screen riêng cho việc
- * đó sẽ đóng mất GUI đang xem, nên không đưa được vào menu.
+ * Calibrate dùng PHÍM TẮT RIÊNG (mặc định "[") thay vì lệnh chat, vì mở chat
+ * sẽ đóng luôn GUI /order hoặc /ah đang mở — dùng phím tắt thì không mở màn
+ * hình nào cả nên GUI vẫn đứng yên trong lúc đọc slot.
+ *
+ * chatdump vẫn là lệnh chat vì lúc dùng (đọc /balance) không có GUI nào đang mở.
  */
 public class AutoTradeMod implements ClientModInitializer {
     private static AutoTradeMod instance;
@@ -38,6 +39,7 @@ public class AutoTradeMod implements ClientModInitializer {
     private AutoTradeConfig config;
     private TradeStateMachine stateMachine;
     private KeyBinding openMenuKey;
+    private KeyBinding calibrateKey;
 
     public static AutoTradeMod getInstance() {
         return instance;
@@ -57,21 +59,27 @@ public class AutoTradeMod implements ClientModInitializer {
                 AUTOTRADE_CATEGORY
         ));
 
+        calibrateKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.autotrade.calibrate",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_LEFT_BRACKET,
+                AUTOTRADE_CATEGORY
+        ));
+
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (stateMachine != null) stateMachine.tick();
             while (openMenuKey.wasPressed()) {
                 openMenu();
             }
+            while (calibrateKey.wasPressed()) {
+                calibrateCurrentScreen();
+            }
         });
 
-        // calibrate/chatdump giữ lại dạng lệnh chat (client-side, KHÔNG gửi lên server)
-        // vì cần chạy trong lúc /order hoặc /ah đang mở.
+        // chatdump giữ dạng lệnh chat (client-side, KHÔNG gửi lên server) vì lúc
+        // dùng để đọc /balance thì không có GUI nào đang mở.
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(ClientCommandManager.literal("autotrade")
-                    .then(ClientCommandManager.literal("calibrate").executes(ctx -> {
-                        calibrateCurrentScreen();
-                        return 1;
-                    }))
                     .then(ClientCommandManager.literal("chatdump").executes(ctx -> {
                         reply("20 dong chat gan nhat (moi nhat o duoi):");
                         for (String line : ChatBuffer.snapshot()) {
@@ -94,9 +102,9 @@ public class AutoTradeMod implements ClientModInitializer {
     }
 
     /**
-     * Mở /order hoặc /ah, đứng nguyên đó rồi gõ lệnh này: nó in ra index + item + dòng
-     * tooltip đầu tiên của TỪNG slot trong GUI đang mở, để bạn đối chiếu với ảnh và điền
-     * đúng số vào autotrade.json (orderCreateChestSlotIndex, ahSearchSignSlotIndex, ...).
+     * Đứng trong /order hoặc /ah, bấm phím "[" (đổi được trong Options -> Controls):
+     * mod in ra chat toàn bộ index + tên item + dòng tooltip đầu tiên của TỪNG slot
+     * trong GUI đang mở, để bạn đối chiếu với ảnh và điền đúng số vào autotrade.json.
      */
     private void calibrateCurrentScreen() {
         HandledScreen<?> screen = ScreenUtil.currentHandledScreen();
