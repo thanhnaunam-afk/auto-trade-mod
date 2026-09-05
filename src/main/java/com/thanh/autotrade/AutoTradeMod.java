@@ -16,6 +16,7 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -30,6 +31,9 @@ import java.util.List;
  */
 public class AutoTradeMod implements ClientModInitializer {
     private static AutoTradeMod instance;
+
+    private static final KeyBinding.Category AUTOTRADE_CATEGORY =
+            KeyBinding.Category.create(Identifier.of("autotrade", "keybinds"));
 
     private AutoTradeConfig config;
     private TradeStateMachine stateMachine;
@@ -50,7 +54,7 @@ public class AutoTradeMod implements ClientModInitializer {
                 "key.autotrade.openmenu",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_BRACKET,
-                "key.categories.autotrade"
+                AUTOTRADE_CATEGORY
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
