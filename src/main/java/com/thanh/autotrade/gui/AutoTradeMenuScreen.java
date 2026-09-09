@@ -2,6 +2,7 @@ package com.thanh.autotrade.gui;
 
 import com.thanh.autotrade.AutoTradeMod;
 import com.thanh.autotrade.config.AutoTradeConfig;
+import com.thanh.autotrade.config.AdvancedConfig;
 import com.thanh.autotrade.trade.TradeStateMachine;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -18,19 +19,22 @@ public class AutoTradeMenuScreen extends Screen {
     private final AutoTradeConfig config;
     private final TradeStateMachine stateMachine;
     private final AutoTradeMod mod;
+    private final AdvancedConfig advancedConfig;
 
     public AutoTradeMenuScreen(AutoTradeConfig config, TradeStateMachine stateMachine, AutoTradeMod mod) {
-        super(Text.literal("AutoTrade"));
+        super(Text.literal("AutoTrade Menu"));
         this.config = config;
         this.stateMachine = stateMachine;
         this.mod = mod;
+        this.advancedConfig = AdvancedConfig.load();
     }
 
     @Override
     protected void init() {
         int centerX = this.width / 2;
-        int top = this.height / 2 - 46;
+        int top = this.height / 2 - 60;
 
+        // Nút Start/Stop
         ButtonWidget toggleButton = ButtonWidget.builder(toggleLabel(), btn -> {
             if (stateMachine.isRunning()) {
                 stateMachine.stop();
@@ -41,27 +45,34 @@ public class AutoTradeMenuScreen extends Screen {
         }).dimensions(centerX - 100, top, 200, 20).build();
         addDrawableChild(toggleButton);
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Nạp lại config (autotrade.json)"), btn -> {
+        // Nút Reload Config
+        addDrawableChild(ButtonWidget.builder(Text.literal("🔄 Nạp lại config (autotrade.json)"), btn -> {
             mod.reloadConfig();
-        }).dimensions(centerX - 100, top + 24, 200, 20).build());
+        }).dimensions(centerX - 100, top + 25, 200, 20).build());
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Đóng"), btn -> close())
-                .dimensions(centerX - 100, top + 48, 200, 20).build());
+        // Nút Settings
+        addDrawableChild(ButtonWidget.builder(Text.literal("⚙️ Settings (Webhook + API)"), btn -> {
+            this.client.setScreen(new SettingsScreen(this, advancedConfig));
+        }).dimensions(centerX - 100, top + 50, 200, 20).build());
+
+        // Nút Đóng
+        addDrawableChild(ButtonWidget.builder(Text.literal("❌ Đóng"), btn -> close())
+                .dimensions(centerX - 100, top + 75, 200, 20).build());
     }
 
     private Text toggleLabel() {
-        return Text.literal(stateMachine.isRunning() ? "Dừng AutoTrade" : "Bật AutoTrade");
+        return Text.literal(stateMachine.isRunning() ? "⏹️ Dừng AutoTrade" : "▶️ Bật AutoTrade");
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
         int centerX = this.width / 2;
-        int top = this.height / 2 - 46;
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, centerX, top - 34, 0xFFFFFF);
+        int top = this.height / 2 - 60;
+        context.drawCenteredTextWithShadow(this.textRenderer, this.title, centerX, top - 30, 0xFFFFFF);
         String status = "Item theo dõi: " + config.items.size() + "  |  Đang chạy: "
-                + (stateMachine.isRunning() ? "CÓ" : "KHÔNG");
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(status), centerX, top - 18, 0xAAAAAA);
+                + (stateMachine.isRunning() ? "✓ CÓ" : "✗ KHÔNG");
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(status), centerX, top - 15, 0xAAAAAA);
     }
 
     @Override
