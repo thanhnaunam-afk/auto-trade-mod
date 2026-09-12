@@ -5,6 +5,16 @@ import com.thanh.autotrade.gui.AutoTradeMenuScreen;
 import com.thanh.autotrade.trade.TradeStateMachine;
 import com.thanh.autotrade.util.ChatBuffer;
 import com.thanh.autotrade.util.ScreenUtil;
+
+import com.thanh.autotrade.ai.GeminiMultiAccountAnalyzer;
+import com.thanh.autotrade.blacklist.BlacklistManager;
+import com.thanh.autotrade.config.AdvancedConfig;
+import com.thanh.autotrade.evade.EvadeDetectionV2;
+import com.thanh.autotrade.integration.DiscordWebhookManager;
+import com.thanh.autotrade.safety.BalanceChecker;
+import com.thanh.autotrade.safety.SafetyManager;
+import com.thanh.autotrade.trade.MultiOrderSystem;
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -22,13 +32,12 @@ import org.lwjgl.glfw.GLFW;
 import java.util.List;
 
 /**
- * Mở menu chính bằng phím "]" (đổi được trong Options -> Controls -> AutoTrade).
- *
- * Calibrate dùng PHÍM TẮT RIÊNG (mặc định "[") thay vì lệnh chat, vì mở chat
- * sẽ đóng luôn GUI /order hoặc /ah đang mở — dùng phím tắt thì không mở màn
- * hình nào cả nên GUI vẫn đứng yên trong lúc đọc slot.
- *
- * chatdump vẫn là lệnh chat vì lúc dùng (đọc /balance) không có GUI nào đang mở.
+ * AutoTrade Mod Phase 2
+ * Integrates: Evade Detection, Multi-Order, Safety, Balance Check, Gemini AI, Blacklist
+ * 
+ * Keybinds:
+ * - "]" (RIGHT_BRACKET): Open main menu
+ * - "[" (LEFT_BRACKET): Calibrate current screen
  */
 public class AutoTradeMod implements ClientModInitializer {
     private static AutoTradeMod instance;
@@ -36,10 +45,20 @@ public class AutoTradeMod implements ClientModInitializer {
     private static final KeyBinding.Category AUTOTRADE_CATEGORY =
             KeyBinding.Category.create(Identifier.of("autotrade", "keybinds"));
 
+    // Phase 1 systems
     private AutoTradeConfig config;
     private TradeStateMachine stateMachine;
     private KeyBinding openMenuKey;
     private KeyBinding calibrateKey;
+
+    // Phase 2 systems
+    private MultiOrderSystem multiOrderSystem;
+    private BalanceChecker balanceChecker;
+    private SafetyManager safetyManager;
+    private BlacklistManager blacklistManager;
+    private DiscordWebhookManager discordWebhook;
+    private GeminiMultiAccountAnalyzer geminiAnalyzer;
+    private AdvancedConfig advancedConfig;
 
     public static AutoTradeMod getInstance() {
         return instance;
@@ -48,10 +67,25 @@ public class AutoTradeMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         instance = this;
+        
+        // Load Phase 1 config
         config = AutoTradeConfig.load();
         stateMachine = new TradeStateMachine(config);
         ChatBuffer.init();
 
+        // Load Phase 2 config
+        try {
+            advancedConfig = new AdvancedConfig();
+            advancedConfig.load();
+            
+            // Initialize Phase 2 systems
+            initializePhase2Systems();
+        } catch (Exception e) {
+            System.err.println("[AutoTrade] Failed to load Phase 2: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        // Register keybindings
         openMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.autotrade.openmenu",
                 InputUtil.Type.KEYSYM,
@@ -66,8 +100,15 @@ public class AutoTradeMod implements ClientModInitializer {
                 AUTOTRADE_CATEGORY
         ));
 
+        // Tick event
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (stateMachine != null) stateMachine.tick();
+            
+            // Phase 2 ticks
+            if (multiOrderSystem != null) multiOrderSystem.tick();
+            if (balanceChecker != null) balanceChecker.tick();
+            if (geminiAnalyzer != null) geminiAnalyzer.tick();
+            
             while (openMenuKey.wasPressed()) {
                 openMenu();
             }
@@ -76,8 +117,7 @@ public class AutoTradeMod implements ClientModInitializer {
             }
         });
 
-        // chatdump giữ dạng lệnh chat (client-side, KHÔNG gửi lên server) vì lúc
-        // dùng để đọc /balance thì không có GUI nào đang mở.
+        // Register commands
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(ClientCommandManager.literal("autotrade")
                     .then(ClientCommandManager.literal("chatdump").executes(ctx -> {
@@ -89,6 +129,36 @@ public class AutoTradeMod implements ClientModInitializer {
                     }))
             );
         });
+
+        reply("✅ AutoTrade Phase 2 loaded!");
+    }
+
+    private void initializePhase2Systems() {
+        // Discord webhook
+        discordWebhook = new DiscordWebhookManager(advancedConfig.discordWebhookUrl);
+
+        // Multi-order system
+        multiOrderSystem = new MultiOrderSystem();
+        multiOrderSystem.loadOrders();
+
+        // Balance checker
+        balanceChecker = new BalanceChecker(discordWebhook);
+
+        // Safety manager
+        safetyManager = new SafetyManager(multiOrderSystem, discordWebhook);
+
+        // Blacklist
+        blacklistManager = new BlacklistManager();
+
+        // Gemini analyzer
+        geminiAnalyzer = new GeminiMultiAccountAnalyzer(advancedConfig, "MainAccount");
+
+        // Evade detection
+        EvadeDetectionV2.init();
+
+        if (discordWebhook != null) {
+            discordWebhook.logEvent("SUCCESS", "🚀 **AutoTrade Phase 2 initialized!**");
+        }
     }
 
     public void openMenu() {
@@ -98,13 +168,11 @@ public class AutoTradeMod implements ClientModInitializer {
     public void reloadConfig() {
         config = AutoTradeConfig.load();
         stateMachine = new TradeStateMachine(config);
-        openMenu(); // mở lại menu để hiển thị dữ liệu mới ngay
+        openMenu();
     }
 
     /**
-     * Đứng trong /order hoặc /ah, bấm phím "[" (đổi được trong Options -> Controls):
-     * mod in ra chat toàn bộ index + tên item + dòng tooltip đầu tiên của TỪNG slot
-     * trong GUI đang mở, để bạn đối chiếu với ảnh và điền đúng số vào autotrade.json.
+     * Calibrate: bấm "[" trong /order hoặc /ah GUI
      */
     private void calibrateCurrentScreen() {
         HandledScreen<?> screen = ScreenUtil.currentHandledScreen();
@@ -128,5 +196,30 @@ public class AutoTradeMod implements ClientModInitializer {
         if (mc.player != null) {
             mc.player.sendMessage(Text.literal("[AutoTrade] " + msg), false);
         }
+    }
+
+    // Getters for Phase 2 systems
+    public MultiOrderSystem getMultiOrderSystem() {
+        return multiOrderSystem;
+    }
+
+    public BalanceChecker getBalanceChecker() {
+        return balanceChecker;
+    }
+
+    public SafetyManager getSafetyManager() {
+        return safetyManager;
+    }
+
+    public BlacklistManager getBlacklistManager() {
+        return blacklistManager;
+    }
+
+    public DiscordWebhookManager getDiscordWebhook() {
+        return discordWebhook;
+    }
+
+    public GeminiMultiAccountAnalyzer getGeminiAnalyzer() {
+        return geminiAnalyzer;
     }
 }
