@@ -1,7 +1,7 @@
 package com.thanh.autotrade.config;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -12,42 +12,52 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Lưu Discord webhook URL, Gemini API key, account name.
- * File: config/autotrade-advanced.json
+ * Advanced config cho Phase 2: Discord webhook, Gemini API key, etc.
  */
 public class AdvancedConfig {
-    public static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("autotrade-advanced.json");
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Path CONFIG_FILE = FabricLoader.getInstance()
+            .getConfigDir().resolve("autotrade-advanced.json");
+    private static final Gson GSON = new Gson();
 
-    public String discordWebhookUrl = "";
-    public String geminiApiKey = "";
-    public String accountName = "main";
-    public boolean autoReconnectEnabled = true;
-    public int autoReconnectDelaySec = 10;
-    public int geminiAnalysisIntervalTicks = 576000; // 8 giờ
-    public int detectionPayoutThreshold = 2; // số lần phát hiện trước khi tự /pay
+    public String discordWebhookUrl = "https://discord.com/api/webhooks/YOUR_WEBHOOK_HERE";
+    public String geminiApiKey = "YOUR_GEMINI_API_KEY";
+    public double marginThresholdGood = 0.08; // 8%
+    public double marginThresholdOk = 0.05; // 5%
+    public double marginThresholdLow = 0.03; // 3%
+    public int detectionRadius = 10;
+    public int scanIntervalMinutes = 10;
+    public int balanceCheckIntervalMinutes = 3;
 
-    public static AdvancedConfig load() {
-        if (!Files.exists(PATH)) {
-            AdvancedConfig def = new AdvancedConfig();
-            def.save();
-            return def;
-        }
-        try (Reader r = Files.newBufferedReader(PATH, StandardCharsets.UTF_8)) {
-            AdvancedConfig cfg = GSON.fromJson(r, AdvancedConfig.class);
-            return cfg != null ? cfg : new AdvancedConfig();
-        } catch (IOException e) {
-            return new AdvancedConfig();
+    public void load() throws IOException {
+        if (Files.exists(CONFIG_FILE)) {
+            try (Reader r = Files.newBufferedReader(CONFIG_FILE, StandardCharsets.UTF_8)) {
+                JsonObject json = GSON.fromJson(r, JsonObject.class);
+                if (json != null) {
+                    discordWebhookUrl = json.get("discordWebhookUrl").getAsString();
+                    geminiApiKey = json.get("geminiApiKey").getAsString();
+                    marginThresholdGood = json.get("marginThresholdGood").getAsDouble();
+                    marginThresholdOk = json.get("marginThresholdOk").getAsDouble();
+                    marginThresholdLow = json.get("marginThresholdLow").getAsDouble();
+                    detectionRadius = json.get("detectionRadius").getAsInt();
+                }
+            }
+        } else {
+            save();
         }
     }
 
-    public void save() {
-        try {
-            Files.createDirectories(PATH.getParent());
-            try (Writer w = Files.newBufferedWriter(PATH, StandardCharsets.UTF_8)) {
-                GSON.toJson(this, w);
-            }
-        } catch (IOException ignored) {
+    public void save() throws IOException {
+        JsonObject json = new JsonObject();
+        json.addProperty("discordWebhookUrl", discordWebhookUrl);
+        json.addProperty("geminiApiKey", geminiApiKey);
+        json.addProperty("marginThresholdGood", marginThresholdGood);
+        json.addProperty("marginThresholdOk", marginThresholdOk);
+        json.addProperty("marginThresholdLow", marginThresholdLow);
+        json.addProperty("detectionRadius", detectionRadius);
+
+        Files.createDirectories(CONFIG_FILE.getParent());
+        try (Writer w = Files.newBufferedWriter(CONFIG_FILE, StandardCharsets.UTF_8)) {
+            GSON.toJson(json, w);
         }
     }
 }
